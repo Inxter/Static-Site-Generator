@@ -227,52 +227,105 @@ class TestCombinationFunctions(unittest.TestCase):
             TextNode("This is plain text with no markdown.", TextType.TEXT),
         ])
 
-class TestMarkdownBlocks(unittest.TestCase):
-    def test_markdown_to_blocks(self):
+
+    def test_paragraphs(self):
         md = """
 This is **bolded** paragraph
+text in a p
+tag here
 
 This is another paragraph with _italic_ text and `code` here
-This is the same paragraph on a new line
 
-- This is a list
-- with items
 """
-        blocks = markdown_to_blocks(md)
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
         self.assertEqual(
-            blocks,
-            [
-                "This is **bolded** paragraph",
-                "This is another paragraph with _italic_ text and `code` here\nThis is the same paragraph on a new line",
-                "- This is a list\n- with items",
-            ],
+            html,
+            "<div><p>This is <b>bolded</b> paragraph text in a p tag here</p><p>This is another paragraph with <i>italic</i> text and <code>code</code> here</p></div>",
         )
-    
-    def test_markdown_to_block_multiple_newlines(self):
+
+    def test_codeblock(self):
         md = """
-# This is a\nmeme header
-
-
-
-- A list
-- With an item
-
-Just some text
-
-
-What does this looks like ?
+```
+This is text that _should_ remain
+the **same** even with inline stuff
+```
 """
-        blocks = markdown_to_blocks(md)
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
         self.assertEqual(
-            blocks,
-            [
-                "# This is a\nmeme header",
-                "- A list\n- With an item",
-                "Just some text",
-                "What does this looks like ?"
-            ]
+            html,
+            "<div><pre><code>This is text that _should_ remain\nthe **same** even with inline stuff\n</code></pre></div>",
         )
 
-        
+    def test_paragraphs_and_inline(self):
+        md = """
+This is **bolded** paragraph
+text in a p
+tag here
+
+This is another paragraph with _italic_ text and `code` here
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        expected = (
+            "<div>"
+            "<p>This is <b>bolded</b> paragraph text in a p tag here</p>"
+            "<p>This is another paragraph with <i>italic</i> text and <code>code</code> here</p>"
+            "</div>"
+        )
+        self.assertEqual(html, expected)
+
+    def test_unordered_list(self):
+        md = """
+- Item 1
+- Item 2 with **bold**
+- Item 3 with _italic_
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        expected = (
+            "<div><ul>"
+            "<li>Item 1</li>"
+            "<li>Item 2 with <b>bold</b></li>"
+            "<li>Item 3 with <i>italic</i></li>"
+            "</ul></div>"
+        )
+        self.assertEqual(html, expected)
+
+    def test_ordered_list(self):
+        md = """
+1. First
+2. Second with `code`
+3. Third
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        expected = (
+            "<div><ol>"
+            "<li>First</li>"
+            "<li>Second with <code>code</code></li>"
+            "<li>Third</li>"
+            "</ol></div>"
+        )
+        self.assertEqual(html, expected)
+
+    def test_blockquote_lines(self):
+        md = """
+> First line of quote
+> Second line of quote
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        expected = (
+            "<div><blockquote>"
+            "<p>First line of quote</p>"
+            "<p>Second line of quote</p>"
+            "</blockquote></div>"
+        )
+        self.assertEqual(html, expected)
+
 if __name__ == "__main__":
     unittest.main()

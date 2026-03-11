@@ -1,5 +1,6 @@
 from textnode import TextNode, TextType
 from htmlnode import HTMLNode, LeafNode, ParentNode
+from markdown_blocks import markdown_to_blocks, BlockType, block_to_block_type
 import re
 
 # This file contains functions
@@ -76,7 +77,7 @@ def split_nodes_delimiter(old_nodes, delimiter, text_type):
     return new_nodes
 
 
-# Functions to extract markdown images and links from text using regular expressions
+# Helper functions to extract markdown images and links from text using regular expressions
 def extract_markdown_images(text):
     result = []
     matches = re.findall(r"!\[([^\]]+)\]\(([^\)]+)\)", text)
@@ -144,18 +145,100 @@ def split_nodes_link(old_nodes):
 
 # Combination function to convert text to text nodes and split them based on markdown syntax for images and links
 def text_to_textnodes(text):
-    node = TextNode(text, TextType.TEXT)
-    split_by_delimiter = split_nodes_delimiter([node], ["**", "_", "`"], [TextType.BOLD, TextType.ITALIC, TextType.CODE])
-    split_by_images = split_nodes_image(split_by_delimiter)
-    final_split = split_nodes_link(split_by_images)
-    return final_split
+    nodes = [TextNode(text, TextType.TEXT)]
+    nodes = split_nodes_delimiter(nodes, "**", TextType.BOLD)
+    nodes = split_nodes_delimiter(nodes, "_", TextType.ITALIC)
+    nodes = split_nodes_delimiter(nodes, "`", TextType.CODE)
+    nodes = split_nodes_image(nodes)
+    nodes = split_nodes_link(nodes)
+    return nodes
 
+# Function to find the appropriate HTML tag for a given markdown block type
+def block_to_html_tag(block):
+    block_type = block_to_block_type(block)
+    if block_type == BlockType.PARAGRAPH:
+        return "p"
+    if block_type == BlockType.HEADING:
+        for i in range(1, 7):
+            if block.startswith("#" * i + " "):
+                return f"h{i}"
+    if block_type == BlockType.CODE:
+        return "pre"
+    if block_type == BlockType.QUOTE:
+        return "blockquote"
+    if block_type == BlockType.UL:
+        return "ul"
+    if block_type == BlockType.OL:
+        return "ol"
 
-def markdown_to_blocks(markdown):
-    blocks = markdown.split("\n\n")
-    temp_list = []
-    for block in blocks:
-        if block == "":
-            continue
-        temp_list.append(block.strip())
-    return temp_list
+# Extract text from block
+def extract_text_from_block(block):
+    block_type = block_to_block_type(block)
+    if block_type == BlockType.HEADING:
+        return block.lstrip("#").strip()
+    if block_type == BlockType.CODE:
+        if block.startswith("```\n") and block.endswith("```"):
+            return block[4:-3]
+        else:
+            return block
+    if block_type == BlockType.QUOTE:
+        lines = block.split("\n")
+        return [line.lstrip(">").strip() for line in lines if line.startswith(">")]
+    if block_type == BlockType.UL:
+        lines = []
+        for line in block.split("\n"):
+            if line.startswith("- "):
+                lines.append(line.lstrip("- ").strip())
+        return lines
+    if block_type == BlockType.OL:
+        lines = []
+        for line in block.split("\n"):
+            match = re.match(r"^\d+\. ", line)
+            if match:
+                lines.append(line[match.end():].strip())
+        return lines
+    if block_type == BlockType.PARAGRAPH:
+        return " ".join(line.strip() for line in block.split("\n"))
+    return block.strip()
+
+# Helper function to convert a list of TextNodes into a list of children HTMLNodes
+def text_to_children(text):
+    text_nodes = text_to_textnodes(text)
+    return [text_node_to_html_node(node) for node in text_nodes]
+
+# Helper function to convert Markdown blocks into Parent and Child nodes
+def block_to_html_node(block):
+    block_type = block_to_block_type(block)
+    html_tag = block_to_html_tag(block)
+    # text is a list for UL and OL
+    text = extract_text_from_block(block)
+    if block_type in [BlockType.PARAGRAPH, BlockType.HEADING]:
+        children = text_to_children(text)
+        parent_node = ParentNode(html_tag, children)
+        return parent_node
+    if block_type == BlockType.QUOTE:
+        children_nodes = [ParentNode("p", text_to_children(line)) for line in text]
+        return ParentNode(html_tag, children_nodes)
+    if block_type == BlockType.CODE:
+        # For code blocks, we want to preserve the newlines and spacing, so we use a LeafNode with a pre tag
+        child_node = LeafNode("code", text)
+        parent_node = ParentNode(html_tag, [child_node])
+        return parent_node
+    if block_type in [BlockType.UL, BlockType.OL]:
+        list_items = []
+        for item in text:
+            children = text_to_children(item)
+            list_items.append(ParentNode("li", children))
+        return ParentNode(html_tag, list_items)
+    
+
+# Function to convert a full markdown document into a tree of HTMLNodes
+def markdown_to_html_node(markdown):
+    # Markdown into blocks
+    markdown_blocks = markdown_to_blocks(markdown)
+    # Blocks into HTMLNodes
+    nodes = []
+    for block in markdown_blocks:
+        nodes.append(block_to_html_node(block))
+
+    return ParentNode("div", nodes)

@@ -183,7 +183,7 @@ def extract_text_from_block(block):
             return block
     if block_type == BlockType.QUOTE:
         lines = block.split("\n")
-        return [line.lstrip(">").strip() for line in lines if line.startswith(">")]
+        return " ".join([line.lstrip(">").strip() for line in lines if line.startswith(">")])
     if block_type == BlockType.UL:
         lines = []
         for line in block.split("\n"):
@@ -217,7 +217,7 @@ def block_to_html_node(block):
         parent_node = ParentNode(html_tag, children)
         return parent_node
     if block_type == BlockType.QUOTE:
-        children_nodes = [ParentNode("p", text_to_children(line)) for line in text]
+        children_nodes = text_to_children(text)
         return ParentNode(html_tag, children_nodes)
     if block_type == BlockType.CODE:
         # For code blocks, we want to preserve the newlines and spacing, so we use a LeafNode with a pre tag
@@ -231,7 +231,6 @@ def block_to_html_node(block):
             list_items.append(ParentNode("li", children))
         return ParentNode(html_tag, list_items)
     
-
 # Function to convert a full markdown document into a tree of HTMLNodes
 def markdown_to_html_node(markdown):
     # Markdown into blocks
@@ -242,3 +241,4 @@ def markdown_to_html_node(markdown):
         nodes.append(block_to_html_node(block))
 
     return ParentNode("div", nodes)
+

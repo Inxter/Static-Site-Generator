@@ -1,6 +1,7 @@
 import os
 from functions import markdown_to_html_node
 from htmlnode import ParentNode
+from main import basepath
 
 # Function to recursively delete items and directories
 def recursive_deletion(path):
@@ -47,7 +48,7 @@ def extract_title(markdown):
             return child.children[0].value
     raise ValueError("No h1 heading found in the markdown to extract title from")
 
-def generate_page(from_path, template_path, dest_path):
+def generate_page(basepath, from_path, template_path, dest_path):
     print(f"Generating page from {from_path} to {dest_path} using {template_path}")
     
     with open(from_path, "r") as f:
@@ -59,23 +60,20 @@ def generate_page(from_path, template_path, dest_path):
     title = extract_title(markdown)
     template = template.replace("{{ Title }}", title)
     template = template.replace("{{ Content }}", html_content)
+    template = template.replace('href="/', f'href="{basepath}')
+    template = template.replace('src="/', f'src="{basepath}')
 
     with open(dest_path, "w") as f:
         f.write(template)
 
-    # Generate HTML
-    #test = markdown_to_html_node(markdown)
-    #test_content = test.to_html()
 
-    # Print the entire HTML (or just the blockquote)
-    #print(test_content)
-
-def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+def generate_pages_recursive(basepath, dir_path_content, template_path, dest_dir_path):
     for item in os.listdir(dir_path_content):
         item_content_path = os.path.join(dir_path_content, item)
         item_dest_path = os.path.join(dest_dir_path, item.replace(".md", ".html"))
+
         if os.path.isfile(item_content_path) and item_content_path.endswith(".md"):
-            generate_page(item_content_path, template_path, item_dest_path)
+            generate_page(basepath, item_content_path, template_path, item_dest_path)
         elif os.path.isdir(item_content_path):
             os.makedirs(item_dest_path, exist_ok=True)
-            generate_pages_recursive(item_content_path, template_path, item_dest_path)
+            generate_pages_recursive(basepath, item_content_path, template_path, item_dest_path)
